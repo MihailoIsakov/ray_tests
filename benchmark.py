@@ -1,23 +1,80 @@
+from multiprocessing import cpu_count
+from tqdm import tqdm
 from time import time
-from hashlib import md5
-from random import randint
+from work import hashloop
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
-def work(s: float, b: int):
-    """Work for a given number of seconds and return a number of bytes."""
-    start = time()
-    array = bytearray(b)
+def worker(args):
+    s, b = args
+    _ = hashloop(s, b)
 
-    # seed first 16 bytes with random values
-    for idx in range(16):
-        array[idx] = randint(0, 255)
 
-    # seed the rest of the array with the md5 hash of the first 16 bytes
-    idx = 16
-    while time() - start < s:
-        array[idx:idx+16] = md5(array[:idx]).digest()
-        idx += 16
-        if idx >= b: idx = 0
+def benchmark_single_thread(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
+    runtimes = np.zeros((len(bytes_list), len(hashes_list)))
 
-    return array
+    for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
+        for h_idx, h in enumerate(tqdm(hashes_list)):
+            start = time()
+            _ = hashloop(b, h)
+            runtimes[b_idx, h_idx] = time() - start
 
+    return runtimes
+
+
+def benchmark_multiprocessing_pool(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
+    from multiprocessing import Pool
+    runtimes = np.zeros((len(bytes_list), len(hashes_list)))
+
+    for h_idx, h in enumerate(tqdm(hashes_list)):
+        for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
+            start = time()
+
+            cpus = cpu_count()
+            with Pool() as pool:
+                pool.map(worker, [(b // cpus, h) for _ in range(cpus)])
+
+            runtimes[b_idx, h_idx] = time() - start
+
+    return runtimes
+
+
+def benchmark_ray_pool_local(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
+    from ray.util.multiprocessing import Pool
+    runtimes = np.zeros((len(bytes_list), len(hashes_list)))
+
+    pool = Pool()
+    for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
+        for h_idx, h in enumerate(tqdm(hashes_list)):
+            start = time()
+
+            cpus = cpu_count()
+            pool.map(worker, [(b // cpus, h) for _ in range(cpus)])
+
+            runtimes[b_idx, h_idx] = time() - start
+
+    return runtimes
+
+
+def plot_runtimes(runtimes: np.ndarray, bytes_list: list[int], hashes_list: list[int]):
+    plt.plot(runtimes, label=[f"{h} hashes" for h in hashes_list])
+    plt.xticks(range(len(bytes_list)), [f"{b} bytes" for b in bytes_list])
+    plt.show()
+
+
+if __name__ == "__main__":
+    sqrt2 = 2**0.5
+    bytes_list = [int(sqrt2 ** x) for x in range(40, 50)]
+    hashes_list = [int(sqrt2 ** x) for x in range(0, 14)]
+
+    # runtimes = benchmark_single_thread(bytes_list, hashes_list)
+    # print("Single thread runtimes:")
+    # print(runtimes)
+    # runtimes = benchmark_multiprocessing_pool(bytes_list, hashes_list)
+    runtimes = benchmark_ray_pool_local(bytes_list, hashes_list)
+    print("Multiprocessing pool runtimes:")
+    print(runtimes)
+    plot_runtimes(runtimes, bytes_list, hashes_list)
+    plot_runtimes((runtimes.T / bytes_list).T, bytes_list, hashes_list)
