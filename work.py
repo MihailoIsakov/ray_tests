@@ -1,23 +1,23 @@
 from time import time
-from hashlib import md5
+from hashlib import sha512
 from random import randint
+from os import urandom
 
 
-def work(s: float, b: int):
-    """Work for a given number of seconds and return a number of bytes."""
-    start = time()
+def hashloop(b: int, hashes: int, hash=sha512, chunk=64):
+    """
+    Iterates over the given `b`-byte array, running a given `hash` function
+    `hashes` times over some random data and storing the results in the array.
+    """
     array = bytearray(b)
 
-    # seed first 16 bytes with random values
-    for idx in range(16):
-        array[idx] = randint(0, 255)
+    seed = urandom(chunk)
+    for idx in range(b // chunk):
+        for _ in range(hashes):
+            seed = hash(seed).digest()
 
-    # seed the rest of the array with the md5 hash of the first 16 bytes
-    idx = 16
-    while time() - start < s:
-        array[idx:idx+16] = md5(array[:idx]).digest()
-        idx += 16
-        if idx >= b: idx = 0
+        array[idx*chunk:idx*chunk+chunk] = seed
 
     return array
+
 
