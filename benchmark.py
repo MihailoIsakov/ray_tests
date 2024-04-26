@@ -3,8 +3,8 @@ from tqdm import tqdm
 from time import time
 from work import hashloop
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import ray
 
 
 def worker(args):
@@ -45,6 +45,7 @@ def benchmark_ray_pool_local(bytes_list: list[int], hashes_list: list[int]) -> n
     from ray.util.multiprocessing import Pool
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
 
+    ray.init("ray://clusterfuzz.boolsi.com:10001")
     pool = Pool()
     for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
         for h_idx, h in enumerate(tqdm(hashes_list)):
