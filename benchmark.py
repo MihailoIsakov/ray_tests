@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 import ray
 
 from time import time
-from hashlib import sha512
+from hashlib import sha512, md5, blake2b
 from random import randint
 from os import urandom
 
 
-def hashloop(b: int, hashes: int, hash=sha512, chunk=64):
+def hashloop(b: int, hashes: int, hash=blake2b, chunk=64):
     """
     Iterates over the given `b`-byte array, running a given `hash` function
     `hashes` times over some random data and storing the results in the array.
@@ -62,15 +62,16 @@ def benchmark_multiprocessing_pool(bytes_list: list[int], hashes_list: list[int]
     return runtimes
 
 
-def benchmark_ray_pool_local(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
+def benchmark_ray_pool(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
     from ray.util.multiprocessing import Pool
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
 
     ray.init("ray://clusterfuzz.boolsi.com:10001")
-    pool = Pool()
-    cpus = int(ray.available_resources()['CPU'])
+    pool = Pool(224, ray_remote_args={"num_cpus": 1})
+    # NOTE: this throws an error if a pool is created?
+    # cpus = int(ray.available_resources()['CPU'])
+    cpus = len(pool._actor_pool)
     print(f"Ray CPU count: {cpus}")
-    cpus *= 8
 
     for h_idx, h in enumerate(tqdm(hashes_list)):
         for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
@@ -91,8 +92,10 @@ def plot_runtimes(runtimes: np.ndarray, bytes_list: list[int], hashes_list: list
 
 if __name__ == "__main__":
     sqrt2 = 2**0.5
-    bytes_list = [int(sqrt2 ** x) for x in range(40, 56)]
-    hashes_list = [2**x for x in range(7, 11)]
+    # bytes_list = [int(sqrt2 ** x) for x in range(40, 56)]
+    # hashes_list = [2**x for x in range(7, 11)]
+    bytes_list = [2**29]
+    hashes_list = [200]
 
     print(f"Bytes list: {bytes_list}")
     print(f"Hash operations list: {hashes_list}")
@@ -105,7 +108,7 @@ if __name__ == "__main__":
     print("Multiprocessing pool runtimes:")
     print(runtimes)
 
-    runtimes = benchmark_ray_pool_local(bytes_list, hashes_list)
+    runtimes = benchmark_ray_pool(bytes_list, hashes_list)
     print("Ray pool runtimes:")
     print(runtimes)
 
