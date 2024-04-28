@@ -8,6 +8,9 @@ import ray
 from tqdm import tqdm
 
 
+ray.init("ray://clusterfuzz.boolsi.com:10001")
+
+
 def hashloop(b: int, hashes: int, hash=blake2b, chunk=64):
     """
     Iterates over the given `b`-byte array, running a given `hash` function
@@ -66,7 +69,6 @@ def benchmark_ray_pool(bytes_list: list[int], hashes_list: list[int]) -> np.ndar
     from ray.util.multiprocessing import Pool
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
 
-    ray.init("ray://clusterfuzz.boolsi.com:10001")
     pool = Pool(224, ray_remote_args={"num_cpus": 1})
     # NOTE: this throws an error if a pool is created?
     # cpus = int(ray.available_resources()['CPU'])
@@ -88,7 +90,6 @@ def benchmark_ray_task(bytes_list: list[int], hashes_list: list[int]) -> np.ndar
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
     worker = ray.remote(hashloop)
 
-    ray.init("ray://clusterfuzz.boolsi.com:10001")
     cpus = int(ray.available_resources()['CPU'])
     print(f"Ray CPU count: {cpus}")
 
@@ -114,7 +115,6 @@ def benchmark_ray_task_wait(bytes_list: list[int], hashes_list: list[int]) -> np
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
     worker = ray.remote(hashloop)
 
-    ray.init("ray://clusterfuzz.boolsi.com:10001")
     cpus = int(ray.available_resources()['CPU'])
     print(f"Ray CPU count: {cpus}")
 
