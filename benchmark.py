@@ -37,15 +37,17 @@ def benchmark_single_thread(bytes_list: list[int], hashes_list: list[int]) -> np
     return runtimes
 
 
+# NOTE: needs to be a top-level function to be pickleable, which multiprocessing requires
+def worker(args):
+    s, b = args
+    _ = hashloop(s, b)
+
+
 def benchmark_multiprocessing_pool(bytes_list: list[int], hashes_list: list[int]) -> np.ndarray:
     """
     NOTE: this should be ran on the head node, not the login machine
     """
     runtimes = np.zeros((len(bytes_list), len(hashes_list)))
-
-    def worker(args):
-        s, b = args
-        _ = hashloop(s, b)
 
     for h_idx, h in enumerate(tqdm(hashes_list)):
         for b_idx, b in enumerate(tqdm(bytes_list, leave=False)):
